@@ -1,9 +1,17 @@
 const express = require('express');
 const mysql = require('mysql2');
+const cors = require('cors'); // Importa el paquete CORS
 require('dotenv').config();
 
 const app = express();
 const port = process.env.PORT || 3000;
+
+// Configuración de CORS
+app.use(cors({
+  origin: '*', // Permite solicitudes desde cualquier origen. Para producción, especifica los orígenes permitidos.
+  methods: 'GET,POST,PUT,DELETE', // Métodos permitidos
+  allowedHeaders: 'Content-Type,Authorization' // Cabeceras permitidas
+}));
 
 app.use(express.json());
 
@@ -46,17 +54,16 @@ app.get('/cursos', (req, res) => {
 
 // Ruta para agregar un nuevo usuario
 app.post('/usuarios', (req, res) => {
-    const { nombre, apellido, contraseña, rol, email } = req.body;
-    db.query('INSERT INTO usuarios (nombre, apellido, contraseña, rol, email) VALUES (?, ?, ?, ?, ?)', [nombre, apellido, contraseña, rol, email], (err, results) => {
-      if (err) {
-        return res.status(500).json({ error: err.message });
-      }
-      res.status(201).json({ message: 'Usuario creado exitosamente', id: results.insertId });
-    });
+  const { nombre, apellido, contraseña, rol, email } = req.body;
+  db.query('INSERT INTO usuarios (nombre, apellido, contraseña, rol, email) VALUES (?, ?, ?, ?, ?)', [nombre, apellido, contraseña, rol, email], (err, results) => {
+    if (err) {
+      return res.status(500).json({ error: err.message });
+    }
+    res.status(201).json({ message: 'Usuario creado exitosamente', id: results.insertId });
   });
-  
+});
 
-// Ruta para agregar un nuevo curso (opcional)
+// Ruta para agregar un nuevo curso
 app.post('/cursos', (req, res) => {
   const { nombreProfesor, genero, telefono, nombreCurso, fecha, email, tiempo, precioCurso, tipoCurso, salon, descripcion } = req.body;
   db.query('INSERT INTO cursos (nombreProfesor, genero, telefono, nombreCurso, fecha, email, tiempo, precioCurso, tipoCurso, salon, descripcion) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', [nombreProfesor, genero, telefono, nombreCurso, fecha, email, tiempo, precioCurso, tipoCurso, salon, descripcion], (err, results) => {
