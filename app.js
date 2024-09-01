@@ -74,6 +74,31 @@ app.post('/cursos', (req, res) => {
   });
 });
 
+// Ruta para el login de usuario
+app.post('/login', (req, res) => {
+  const { email, contraseña } = req.body;
+  
+  // Verificar si el correo electrónico y la contraseña están presentes
+  if (!email || !contraseña) {
+    return res.status(400).json({ error: 'Correo electrónico y contraseña son requeridos' });
+  }
+
+  // Consultar el usuario en la base de datos
+  db.query('SELECT * FROM usuarios WHERE email = ? AND contraseña = ?', [email, contraseña], (err, results) => {
+    if (err) {
+      return res.status(500).json({ error: err.message });
+    }
+
+    if (results.length > 0) {
+      // Usuario encontrado, enviar la respuesta con el usuario
+      res.status(200).json(results[0]);
+    } else {
+      // Usuario no encontrado, enviar un mensaje de error
+      res.status(401).json({ error: 'Correo electrónico o contraseña incorrectos' });
+    }
+  });
+});
+
 app.listen(port, () => {
   console.log(`Servidor corriendo en http://localhost:${port}`);
 });
