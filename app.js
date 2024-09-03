@@ -99,6 +99,25 @@ app.post('/login', (req, res) => {
   });
 });
 
+// Ruta para eliminar un curso
+app.delete('/cursos/:idCurso', (req, res) => {
+  const { idCurso } = req.params;
+
+  db.query('DELETE FROM cursos WHERE idCurso = ?', [idCurso], (err, results) => {
+    if (err) {
+      return res.status(500).json({ error: err.message });
+    }
+    
+    if (results.affectedRows > 0) {
+      // Curso eliminado con éxito
+      res.status(200).json({ message: 'Curso eliminado exitosamente' });
+    } else {
+      // No se encontró el curso para eliminar
+      res.status(404).json({ error: 'Curso no encontrado' });
+    }
+  });
+});
+
 app.listen(port, () => {
   console.log(`Servidor corriendo en http://localhost:${port}`);
 });
