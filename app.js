@@ -123,19 +123,20 @@ app.put('/cursos/:idCurso', (req, res) => {
   const { idCurso } = req.params;
   const { nombreProfesor, genero, telefono, nombreCurso, fecha, email, tiempo, precioCurso, tipoCurso, salon, descripcion } = req.body;
 
-  db.query('UPDATE cursos SET nombreProfesor = ?, genero = ?, telefono = ?, nombreCurso = ?, fecha = ?, email = ?, tiempo = ?, precioCurso = ?, tipoCurso = ?, salon = ?, descripcion = ? WHERE idCurso = ?', [nombreProfesor, genero, telefono, nombreCurso, fecha, email, tiempo, precioCurso, tipoCurso, salon, descripcion, idCurso], (err, results) => {
-    if (err) {
-      return res.status(500).json({ error: err.message });
+  db.query(
+    `UPDATE cursos SET nombreProfesor = ?, genero = ?, telefono = ?, nombreCurso = ?, fecha = ?, email = ?, tiempo = ?, precioCurso = ?, tipoCurso = ?, salon = ?, descripcion = ? WHERE idCurso = ?`,
+    [nombreProfesor, genero, telefono, nombreCurso, fecha, email, tiempo, precioCurso, tipoCurso, salon, descripcion, idCurso],
+    (err, results) => {
+      if (err) {
+        return res.status(500).json({ error: err.message });
+      }
+      if (results.affectedRows > 0) {
+        res.status(200).json({ message: 'Curso actualizado exitosamente' });
+      } else {
+        res.status(404).json({ error: 'Curso no encontrado' });
+      }
     }
-
-    if (results.affectedRows > 0) {
-      // Curso actualizado con éxito
-      res.status(200).json({ message: 'Curso actualizado exitosamente' });
-    } else {
-      // No se encontró el curso para actualizar
-      res.status(404).json({ error: 'Curso no encontrado' });
-    }
-  });
+  );
 });
 
 app.listen(port, () => {
