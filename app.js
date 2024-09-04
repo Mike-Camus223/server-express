@@ -1,10 +1,15 @@
 const express = require('express');
 const mysql = require('mysql2');
-const cors = require('cors'); // Importa el paquete CORS
+const cors = require('cors');
 require('dotenv').config();
 
 const app = express();
 const port = process.env.PORT || 3000;
+
+// Establecer NODE_ENV a 'production' si no está definido
+process.env.NODE_ENV = process.env.NODE_ENV || 'production';
+
+console.log(`Starting server in ${process.env.NODE_ENV} mode`);
 
 // Configuración de CORS
 app.use(cors({
@@ -31,6 +36,8 @@ db.connect((err) => {
   }
   console.log('Conexión a la base de datos establecida.');
 });
+
+// Rutas de la aplicación
 
 // Ruta para obtener todos los usuarios
 app.get('/usuarios', (req, res) => {
@@ -66,7 +73,9 @@ app.post('/usuarios', (req, res) => {
 // Ruta para agregar un nuevo curso
 app.post('/cursos', (req, res) => {
   const { nombreProfesor, genero, telefono, nombreCurso, fecha, email, tiempo, precioCurso, tipoCurso, salon, descripcion } = req.body;
-  db.query('INSERT INTO cursos (nombreProfesor, genero, telefono, nombreCurso, fecha, email, tiempo, precioCurso, tipoCurso, salon, descripcion) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', [nombreProfesor, genero, telefono, nombreCurso, fecha, email, tiempo, precioCurso, tipoCurso, salon, descripcion], (err, results) => {
+  db.query('INSERT INTO cursos (nombreProfesor, genero, telefono, nombreCurso, fecha, email, tiempo, precioCurso, tipoCurso, salon, descripcion) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', 
+  [nombreProfesor, genero, telefono, nombreCurso, fecha, email, tiempo, precioCurso, tipoCurso, salon, descripcion], 
+  (err, results) => {
     if (err) {
       return res.status(500).json({ error: err.message });
     }
@@ -78,22 +87,18 @@ app.post('/cursos', (req, res) => {
 app.post('/login', (req, res) => {
   const { email, contraseña } = req.body;
   
-  // Verificar si el correo electrónico y la contraseña están presentes
   if (!email || !contraseña) {
     return res.status(400).json({ error: 'Correo electrónico y contraseña son requeridos' });
   }
 
-  // Consultar el usuario en la base de datos
   db.query('SELECT * FROM usuarios WHERE email = ? AND contraseña = ?', [email, contraseña], (err, results) => {
     if (err) {
       return res.status(500).json({ error: err.message });
     }
 
     if (results.length > 0) {
-      // Usuario encontrado, enviar la respuesta con el usuario
       res.status(200).json(results[0]);
     } else {
-      // Usuario no encontrado, enviar un mensaje de error
       res.status(401).json({ error: 'Correo electrónico o contraseña incorrectos' });
     }
   });
@@ -109,10 +114,8 @@ app.delete('/cursos/:idCurso', (req, res) => {
     }
     
     if (results.affectedRows > 0) {
-      // Curso eliminado con éxito
       res.status(200).json({ message: 'Curso eliminado exitosamente' });
     } else {
-      // No se encontró el curso para eliminar
       res.status(404).json({ error: 'Curso no encontrado' });
     }
   });
@@ -123,9 +126,8 @@ app.put('/cursos/:idCurso', (req, res) => {
   const { idCurso } = req.params;
   const { nombreProfesor, genero, telefono, nombreCurso, fecha, email, tiempo, precioCurso, tipoCurso, salon, descripcion } = req.body;
 
-  db.query(
-    `UPDATE cursos SET nombreProfesor = ?, genero = ?, telefono = ?, nombreCurso = ?, fecha = ?, email = ?, tiempo = ?, precioCurso = ?, tipoCurso = ?, salon = ?, descripcion = ? WHERE idCurso = ?`,
-    [nombreProfesor, genero, telefono, nombreCurso, fecha, email, tiempo, precioCurso, tipoCurso, salon, descripcion, idCurso],
+  db.query('UPDATE cursos SET nombreProfesor = ?, genero = ?, telefono = ?, nombreCurso = ?, fecha = ?, email = ?, tiempo = ?, precioCurso = ?, tipoCurso = ?, salon = ?, descripcion = ? WHERE idCurso = ?', 
+    [nombreProfesor, genero, telefono, nombreCurso, fecha, email, tiempo, precioCurso, tipoCurso, salon, descripcion, idCurso], 
     (err, results) => {
       if (err) {
         return res.status(500).json({ error: err.message });
