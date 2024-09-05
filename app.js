@@ -7,14 +7,9 @@ require('dotenv').config();
 const app = express();
 const port = process.env.PORT || 3000;
 
-// Establecer NODE_ENV a 'production' si no está definido
-process.env.NODE_ENV = process.env.NODE_ENV || 'production';
-
-console.log(`Starting server in ${process.env.NODE_ENV} mode`);
-
 // Configuración de CORS
 app.use(cors({
-  origin: 'http://localhost:4200', // Cambia esto si tu aplicación Angular está en otro puerto u origen
+  origin: 'http://localhost:4200', // Permitir solicitudes desde tu aplicación Angular
   methods: 'GET,POST,PUT,DELETE',
   allowedHeaders: 'Content-Type,Authorization'
 }));
@@ -38,27 +33,21 @@ db.connect((err) => {
   console.log('Conexión a la base de datos establecida.');
 });
 
-// Middleware para verificar el token JWT
-const verificarToken = (req, res, next) => {
-  const token = req.headers['authorization'];
-
+// Middleware para verificar el token
+function verificarToken(req, res, next) {
+  const token = req.headers['authorization']?.split(' ')[1]; // Obtener el token del encabezado Authorization
   if (!token) {
     return res.status(401).json({ error: 'Token no proporcionado' });
   }
 
-  const tokenLimpio = token.replace('Bearer ', '');
-
-  jwt.verify(tokenLimpio, process.env.JWT_SECRET, (err, decoded) => {
+  jwt.verify(token, process.env.JWT_SECRET, (err, decoded) => {
     if (err) {
-      return res.status(401).json({ error: 'Token no válido' });
+      return res.status(401).json({ error: 'Token inválido' });
     }
-
-    req.userId = decoded.id; // Almacenar el ID del usuario para futuras referencias
-    next(); // Continuar con la solicitud
+    req.user = decoded;
+    next();
   });
-};
-
-// Rutas de la aplicación
+}
 
 // Ruta para el login de usuario
 app.post('/login', (req, res) => {
@@ -88,7 +77,7 @@ app.post('/login', (req, res) => {
   });
 });
 
-// Ruta para registrar un nuevo usuario
+// Ruta para obtener todos los usuarios
 app.get('/usuarios', verificarToken, (req, res) => {
   db.query('SELECT * FROM usuarios', (err, results) => {
     if (err) {
@@ -98,37 +87,20 @@ app.get('/usuarios', verificarToken, (req, res) => {
   });
 });
 
-// Ruta protegida para obtener el perfil del usuario autenticado
-app.get('/perfil', verificarToken, (req, res) => {
-  const userId = req.userId;
-
-  db.query('SELECT * FROM usuarios WHERE idUser = ?', [userId], (err, results) => {
+// Ruta para agregar un nuevo usuario
+app.post('/usuarios', (req, res) => {
+  const { nombre, apellido, contraseña, rol, email } = req.body;
+  db.query('INSERT INTO usuarios (nombre, apellido, contraseña, rol, email) VALUES (?, ?, ?, ?, ?)', [nombre, apellido, contraseña, rol, email], (err, results) => {
     if (err) {
       return res.status(500).json({ error: err.message });
     }
-
-    if (results.length > 0) {
-      res.json(results[0]);
-    } else {
-      res.status(404).json({ error: 'Usuario no encontrado' });
-    }
-  });
-});
-
-// Ruta para obtener todos los cursos
-app.get('/cursos', (req, res) => {
-  db.query('SELECT * FROM cursos', (err, results) => {
-    if (err) {
-      return res.status(500).json({ error: err.message });
-    }
-    res.json(results);
+    res.status(201).json({ message: 'Usuario creado exitosamente', id: results.insertId });
   });
 });
 
 // Ruta para agregar un nuevo curso
-app.post('/cursos', verificarToken, (req, res) => {
+app.post('/cursos', (req, res) => {
   const { nombreProfesor, genero, telefono, nombreCurso, fecha, email, tiempo, precioCurso, tipoCurso, salon, descripcion } = req.body;
-  
   db.query('INSERT INTO cursos (nombreProfesor, genero, telefono, nombreCurso, fecha, email, tiempo, precioCurso, tipoCurso, salon, descripcion) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', 
   [nombreProfesor, genero, telefono, nombreCurso, fecha, email, tiempo, precioCurso, tipoCurso, salon, descripcion], 
   (err, results) => {
@@ -136,6 +108,16 @@ app.post('/cursos', verificarToken, (req, res) => {
       return res.status(500).json({ error: err.message });
     }
     res.status(201).json({ message: 'Curso creado exitosamente', id: results.insertId });
+  });
+});
+
+// Ruta para obtener todos los cursos
+app.get('/cursos', verificarToken, (req, res) => {
+  db.query('SELECT * FROM cursos', (err, results) => {
+    if (err) {
+      return res.status(500).json({ error: err.message });
+    }
+    res.json(results);
   });
 });
 
