@@ -106,6 +106,7 @@ app.post('/login', (req, res) => {
   });
 });
 
+
 // Ruta para eliminar un curso
 app.delete('/cursos/:idCurso', (req, res) => {
   const { idCurso } = req.params;
