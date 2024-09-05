@@ -1,7 +1,7 @@
 const express = require('express');
 const mysql = require('mysql2');
 const cors = require('cors');
-const jwt = require('jsonwebtoken'); // Agregado para JWT
+const jwt = require('jsonwebtoken');
 require('dotenv').config();
 
 const app = express();
@@ -9,7 +9,6 @@ const port = process.env.PORT || 3000;
 
 // Establecer NODE_ENV a 'production' si no está definido
 process.env.NODE_ENV = process.env.NODE_ENV || 'production';
-
 console.log(`Starting server in ${process.env.NODE_ENV} mode`);
 
 // Configuración de CORS
@@ -36,6 +35,34 @@ db.connect((err) => {
     return;
   }
   console.log('Conexión a la base de datos establecida.');
+});
+
+// Middleware para verificar el token
+const authenticateToken = (req, res, next) => {
+  const authHeader = req.headers.authorization;
+  const token = authHeader && authHeader.split(' ')[1];
+  
+  if (token == null) return res.sendStatus(401);
+  
+  jwt.verify(token, process.env.JWT_SECRET, (err, user) => {
+    if (err) return res.sendStatus(403);
+    req.user = user;
+    next();
+  });
+};
+
+// Ruta para obtener los detalles del usuario autenticado
+app.get('/usuarios/me', authenticateToken, (req, res) => {
+  db.query('SELECT * FROM usuarios WHERE idUser = ?', [req.user.id], (err, results) => {
+    if (err) {
+      return res.status(500).json({ error: err.message });
+    }
+    if (results.length > 0) {
+      res.json(results[0]);
+    } else {
+      res.status(404).json({ error: 'Usuario no encontrado' });
+    }
+  });
 });
 
 // Ruta para obtener todos los usuarios
