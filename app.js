@@ -14,9 +14,9 @@ console.log(`Starting server in ${process.env.NODE_ENV} mode`);
 
 // Configuración de CORS
 app.use(cors({
-  origin: '*', // Permite solicitudes desde cualquier origen. Para producción, especifica los orígenes permitidos.
-  methods: 'GET,POST,PUT,DELETE', // Métodos permitidos
-  allowedHeaders: 'Content-Type,Authorization' // Cabeceras permitidas
+  origin: 'http://localhost:4200', // Cambia esto si tu aplicación Angular está en otro puerto u origen
+  methods: 'GET,POST,PUT,DELETE',
+  allowedHeaders: 'Content-Type,Authorization'
 }));
 
 app.use(express.json());
@@ -78,7 +78,7 @@ app.post('/login', (req, res) => {
       
       // Generar el token JWT
       const token = jwt.sign({ id: usuario.idUser }, process.env.JWT_SECRET, {
-        expiresIn: '1h' // Expiración del token
+        expiresIn: '1h'
       });
 
       res.status(200).json({ token, usuario });
@@ -89,21 +89,13 @@ app.post('/login', (req, res) => {
 });
 
 // Ruta para registrar un nuevo usuario
-app.post('/usuarios', (req, res) => {
-  const { nombre, apellido, contraseña, rol, email } = req.body;
-  
-  if (!nombre || !apellido || !contraseña || !email) {
-    return res.status(400).json({ error: 'Todos los campos son requeridos' });
-  }
-
-  db.query('INSERT INTO usuarios (nombre, apellido, contraseña, rol, email) VALUES (?, ?, ?, ?, ?)', 
-    [nombre, apellido, contraseña, rol, email], 
-    (err, results) => {
-      if (err) {
-        return res.status(500).json({ error: err.message });
-      }
-      res.status(201).json({ message: 'Usuario creado exitosamente', id: results.insertId });
-    });
+app.get('/usuarios', verificarToken, (req, res) => {
+  db.query('SELECT * FROM usuarios', (err, results) => {
+    if (err) {
+      return res.status(500).json({ error: err.message });
+    }
+    res.json(results);
+  });
 });
 
 // Ruta protegida para obtener el perfil del usuario autenticado
