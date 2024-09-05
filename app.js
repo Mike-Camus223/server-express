@@ -1,19 +1,22 @@
 const express = require('express');
 const mysql = require('mysql2');
 const cors = require('cors');
-const bcrypt = require('bcryptjs');  // Para encriptar contraseñas
-const jwt = require('jsonwebtoken'); // Para generar tokens JWT
+const jwt = require('jsonwebtoken');
 require('dotenv').config();
 
 const app = express();
 const port = process.env.PORT || 3000;
-const jwtSecret = process.env.JWT_SECRET || 'your_jwt_secret'; // Llave secreta para firmar tokens
+
+// Establecer NODE_ENV a 'production' si no está definido
+process.env.NODE_ENV = process.env.NODE_ENV || 'production';
+
+console.log(`Starting server in ${process.env.NODE_ENV} mode`);
 
 // Configuración de CORS
 app.use(cors({
-  origin: '*', // Cambiar en producción para restringir a orígenes específicos
-  methods: 'GET,POST,PUT,DELETE',
-  allowedHeaders: 'Content-Type,Authorization'
+  origin: '*', // Permite solicitudes desde cualquier origen. Para producción, especifica los orígenes permitidos.
+  methods: 'GET,POST,PUT,DELETE', // Métodos permitidos
+  allowedHeaders: 'Content-Type,Authorization' // Cabeceras permitidas
 }));
 
 app.use(express.json());
@@ -35,85 +38,88 @@ db.connect((err) => {
   console.log('Conexión a la base de datos establecida.');
 });
 
-// Ruta para registrar un nuevo usuario con contraseña encriptada
-app.post('/usuarios', async (req, res) => {
-  const { nombre, apellido, contraseña, rol, email } = req.body;
+// Middleware para verificar el token JWT
+const verificarToken = (req, res, next) => {
+  const token = req.headers['authorization'];
 
-  try {
-    // Encriptar la contraseña
-    const hashedPassword = await bcrypt.hash(contraseña, 10);
-
-    db.query('INSERT INTO usuarios (nombre, apellido, contraseña, rol, email) VALUES (?, ?, ?, ?, ?)', 
-      [nombre, apellido, hashedPassword, rol, email], 
-      (err, results) => {
-        if (err) {
-          return res.status(500).json({ error: err.message });
-        }
-        res.status(201).json({ message: 'Usuario creado exitosamente', id: results.insertId });
-    });
-  } catch (error) {
-    res.status(500).json({ error: 'Error al registrar usuario' });
+  if (!token) {
+    return res.status(401).json({ error: 'Token no proporcionado' });
   }
-});
 
-// Ruta para el login de usuario con JWT
+  const tokenLimpio = token.replace('Bearer ', '');
+
+  jwt.verify(tokenLimpio, process.env.JWT_SECRET, (err, decoded) => {
+    if (err) {
+      return res.status(401).json({ error: 'Token no válido' });
+    }
+
+    req.userId = decoded.id; // Almacenar el ID del usuario para futuras referencias
+    next(); // Continuar con la solicitud
+  });
+};
+
+// Rutas de la aplicación
+
+// Ruta para el login de usuario
 app.post('/login', (req, res) => {
   const { email, contraseña } = req.body;
-
+  
   if (!email || !contraseña) {
     return res.status(400).json({ error: 'Correo electrónico y contraseña son requeridos' });
   }
 
-  db.query('SELECT * FROM usuarios WHERE email = ?', [email], async (err, results) => {
+  db.query('SELECT * FROM usuarios WHERE email = ? AND contraseña = ?', [email, contraseña], (err, results) => {
     if (err) {
       return res.status(500).json({ error: err.message });
     }
 
-    if (results.length === 0) {
-      return res.status(401).json({ error: 'Correo electrónico o contraseña incorrectos' });
+    if (results.length > 0) {
+      const usuario = results[0];
+      
+      // Generar el token JWT
+      const token = jwt.sign({ id: usuario.idUser }, process.env.JWT_SECRET, {
+        expiresIn: '1h' // Expiración del token
+      });
+
+      res.status(200).json({ token, usuario });
+    } else {
+      res.status(401).json({ error: 'Correo electrónico o contraseña incorrectos' });
     }
-
-    const user = results[0];
-
-    // Verificar la contraseña
-    const validPassword = await bcrypt.compare(contraseña, user.contraseña);
-    if (!validPassword) {
-      return res.status(401).json({ error: 'Correo electrónico o contraseña incorrectos' });
-    }
-
-    // Generar el token JWT
-    const token = jwt.sign({ idUser: user.idUser, email: user.email, rol: user.rol }, jwtSecret, { expiresIn: '1h' });
-
-    res.status(200).json({ token, user: { idUser: user.idUser, email: user.email, nombre: user.nombre, rol: user.rol } });
   });
 });
 
-// Middleware para proteger rutas con autenticación
-function authenticateToken(req, res, next) {
-  const authHeader = req.headers['authorization'];
-  const token = authHeader && authHeader.split(' ')[1];
+// Ruta para registrar un nuevo usuario
+app.post('/usuarios', (req, res) => {
+  const { nombre, apellido, contraseña, rol, email } = req.body;
+  
+  if (!nombre || !apellido || !contraseña || !email) {
+    return res.status(400).json({ error: 'Todos los campos son requeridos' });
+  }
 
-  if (token == null) return res.sendStatus(401);
-
-  jwt.verify(token, jwtSecret, (err, user) => {
-    if (err) return res.sendStatus(403);
-    req.user = user;
-    next();
-  });
-}
-
-// Ruta protegida de ejemplo
-app.get('/perfil', authenticateToken, (req, res) => {
-  res.json({ message: 'Perfil de usuario', user: req.user });
+  db.query('INSERT INTO usuarios (nombre, apellido, contraseña, rol, email) VALUES (?, ?, ?, ?, ?)', 
+    [nombre, apellido, contraseña, rol, email], 
+    (err, results) => {
+      if (err) {
+        return res.status(500).json({ error: err.message });
+      }
+      res.status(201).json({ message: 'Usuario creado exitosamente', id: results.insertId });
+    });
 });
 
-// Ruta para obtener todos los usuarios (protegida)
-app.get('/usuarios', authenticateToken, (req, res) => {
-  db.query('SELECT * FROM usuarios', (err, results) => {
+// Ruta protegida para obtener el perfil del usuario autenticado
+app.get('/perfil', verificarToken, (req, res) => {
+  const userId = req.userId;
+
+  db.query('SELECT * FROM usuarios WHERE idUser = ?', [userId], (err, results) => {
     if (err) {
       return res.status(500).json({ error: err.message });
     }
-    res.json(results);
+
+    if (results.length > 0) {
+      res.json(results[0]);
+    } else {
+      res.status(404).json({ error: 'Usuario no encontrado' });
+    }
   });
 });
 
@@ -128,9 +134,9 @@ app.get('/cursos', (req, res) => {
 });
 
 // Ruta para agregar un nuevo curso
-app.post('/cursos', (req, res) => {
+app.post('/cursos', verificarToken, (req, res) => {
   const { nombreProfesor, genero, telefono, nombreCurso, fecha, email, tiempo, precioCurso, tipoCurso, salon, descripcion } = req.body;
-
+  
   db.query('INSERT INTO cursos (nombreProfesor, genero, telefono, nombreCurso, fecha, email, tiempo, precioCurso, tipoCurso, salon, descripcion) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', 
   [nombreProfesor, genero, telefono, nombreCurso, fecha, email, tiempo, precioCurso, tipoCurso, salon, descripcion], 
   (err, results) => {
@@ -142,14 +148,14 @@ app.post('/cursos', (req, res) => {
 });
 
 // Ruta para eliminar un curso
-app.delete('/cursos/:idCurso', (req, res) => {
+app.delete('/cursos/:idCurso', verificarToken, (req, res) => {
   const { idCurso } = req.params;
 
   db.query('DELETE FROM cursos WHERE idCurso = ?', [idCurso], (err, results) => {
     if (err) {
       return res.status(500).json({ error: err.message });
     }
-
+    
     if (results.affectedRows > 0) {
       res.status(200).json({ message: 'Curso eliminado exitosamente' });
     } else {
@@ -159,7 +165,7 @@ app.delete('/cursos/:idCurso', (req, res) => {
 });
 
 // Ruta para actualizar un curso
-app.put('/cursos/:idCurso', (req, res) => {
+app.put('/cursos/:idCurso', verificarToken, (req, res) => {
   const { idCurso } = req.params;
   const { nombreProfesor, genero, telefono, nombreCurso, fecha, email, tiempo, precioCurso, tipoCurso, salon, descripcion } = req.body;
 
