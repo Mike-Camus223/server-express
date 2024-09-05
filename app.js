@@ -1,17 +1,21 @@
 const express = require('express');
 const mysql = require('mysql2');
 const cors = require('cors');
-const jwt = require('jsonwebtoken');
 require('dotenv').config();
 
 const app = express();
 const port = process.env.PORT || 3000;
 
+// Establecer NODE_ENV a 'production' si no está definido
+process.env.NODE_ENV = process.env.NODE_ENV || 'production';
+
+console.log(`Starting server in ${process.env.NODE_ENV} mode`);
+
 // Configuración de CORS
 app.use(cors({
-  origin: 'http://localhost:4200', // Permitir solicitudes desde tu aplicación Angular
-  methods: 'GET,POST,PUT,DELETE',
-  allowedHeaders: 'Content-Type,Authorization'
+  origin: 'http://localhost:4200', // Permite solicitudes solo desde este origen
+  methods: 'GET,POST,PUT,DELETE', // Métodos permitidos
+  allowedHeaders: 'Content-Type,Authorization' // Cabeceras permitidas
 }));
 
 app.use(express.json());
@@ -33,53 +37,21 @@ db.connect((err) => {
   console.log('Conexión a la base de datos establecida.');
 });
 
-// Middleware para verificar el token
-function verificarToken(req, res, next) {
-  const token = req.headers['authorization']?.split(' ')[1]; // Obtener el token del encabezado Authorization
-  if (!token) {
-    return res.status(401).json({ error: 'Token no proporcionado' });
-  }
+// Rutas de la aplicación
 
-  jwt.verify(token, process.env.JWT_SECRET, (err, decoded) => {
-    if (err) {
-      return res.status(401).json({ error: 'Token inválido' });
-    }
-    req.user = decoded;
-    next();
-  });
-}
-
-// Ruta para el login de usuario
-app.post('/login', (req, res) => {
-  const { email, contraseña } = req.body;
-  
-  if (!email || !contraseña) {
-    return res.status(400).json({ error: 'Correo electrónico y contraseña son requeridos' });
-  }
-
-  db.query('SELECT * FROM usuarios WHERE email = ? AND contraseña = ?', [email, contraseña], (err, results) => {
+// Ruta para obtener todos los usuarios
+app.get('/usuarios', (req, res) => {
+  db.query('SELECT * FROM usuarios', (err, results) => {
     if (err) {
       return res.status(500).json({ error: err.message });
     }
-
-    if (results.length > 0) {
-      const usuario = results[0];
-      
-      // Generar el token JWT
-      const token = jwt.sign({ id: usuario.idUser }, process.env.JWT_SECRET, {
-        expiresIn: '1h'
-      });
-
-      res.status(200).json({ token, usuario });
-    } else {
-      res.status(401).json({ error: 'Correo electrónico o contraseña incorrectos' });
-    }
+    res.json(results);
   });
 });
 
-// Ruta para obtener todos los usuarios
-app.get('/usuarios', verificarToken, (req, res) => {
-  db.query('SELECT * FROM usuarios', (err, results) => {
+// Ruta para obtener todos los cursos
+app.get('/cursos', (req, res) => {
+  db.query('SELECT * FROM cursos', (err, results) => {
     if (err) {
       return res.status(500).json({ error: err.message });
     }
@@ -111,18 +83,31 @@ app.post('/cursos', (req, res) => {
   });
 });
 
-// Ruta para obtener todos los cursos
-app.get('/cursos', verificarToken, (req, res) => {
-  db.query('SELECT * FROM cursos', (err, results) => {
+// Ruta para el login de usuario
+app.post('/login', (req, res) => {
+  const { email, contraseña } = req.body;
+  
+  if (!email || !contraseña) {
+    return res.status(400).json({ error: 'Correo electrónico y contraseña son requeridos' });
+  }
+
+  db.query('SELECT * FROM usuarios WHERE email = ? AND contraseña = ?', [email, contraseña], (err, results) => {
     if (err) {
       return res.status(500).json({ error: err.message });
     }
-    res.json(results);
+
+    if (results.length > 0) {
+      // Crear un token JWT aquí y devolverlo
+      const token = 'TOKEN_GENERADO'; // Generar un token JWT real aquí
+      res.status(200).json({ ...results[0], token }); // Devolver el token junto con el usuario
+    } else {
+      res.status(401).json({ error: 'Correo electrónico o contraseña incorrectos' });
+    }
   });
 });
 
 // Ruta para eliminar un curso
-app.delete('/cursos/:idCurso', verificarToken, (req, res) => {
+app.delete('/cursos/:idCurso', (req, res) => {
   const { idCurso } = req.params;
 
   db.query('DELETE FROM cursos WHERE idCurso = ?', [idCurso], (err, results) => {
@@ -139,7 +124,7 @@ app.delete('/cursos/:idCurso', verificarToken, (req, res) => {
 });
 
 // Ruta para actualizar un curso
-app.put('/cursos/:idCurso', verificarToken, (req, res) => {
+app.put('/cursos/:idCurso', (req, res) => {
   const { idCurso } = req.params;
   const { nombreProfesor, genero, telefono, nombreCurso, fecha, email, tiempo, precioCurso, tipoCurso, salon, descripcion } = req.body;
 
