@@ -1,6 +1,7 @@
 const express = require('express');
 const mysql = require('mysql2');
 const cors = require('cors');
+const jwt = require('jsonwebtoken'); // Agregado para JWT
 require('dotenv').config();
 
 const app = express();
@@ -36,8 +37,6 @@ db.connect((err) => {
   }
   console.log('Conexión a la base de datos establecida.');
 });
-
-// Rutas de la aplicación
 
 // Ruta para obtener todos los usuarios
 app.get('/usuarios', (req, res) => {
@@ -97,15 +96,14 @@ app.post('/login', (req, res) => {
     }
 
     if (results.length > 0) {
-      // Crear un token JWT aquí y devolverlo
-      const token = 'TOKEN_GENERADO'; // Generar un token JWT real aquí
-      res.status(200).json({ ...results[0], token }); // Devolver el token junto con el usuario
+      // Crear un token JWT aquí
+      const token = jwt.sign({ id: results[0].idUser }, process.env.JWT_SECRET, { expiresIn: '1h' });
+      res.status(200).json({ usuario: results[0], token }); // Devolver el token junto con el usuario
     } else {
       res.status(401).json({ error: 'Correo electrónico o contraseña incorrectos' });
     }
   });
 });
-
 
 // Ruta para eliminar un curso
 app.delete('/cursos/:idCurso', (req, res) => {
